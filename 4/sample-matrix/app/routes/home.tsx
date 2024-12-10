@@ -123,9 +123,14 @@ export default function Home() {
     let count = 0;
     
     const directions = [
-      [-1, -1], [-1, 0], [-1, 1],  // Up diagonals and vertical
-      [0, -1], [0, 1],             // Horizontals
-      [1, -1], [1, 0], [1, 1]      // Down diagonals and vertical
+      [-1, 0],   // Up
+      [-1, 1],   // Up-Right
+      [0, 1],    // Right
+      [1, 1],    // Down-Right
+      [1, 0],    // Down
+      [1, -1],   // Down-Left
+      [0, -1],   // Left
+      [-1, -1]   // Up-Left
     ];
 
     for (let row = 0; row < input.length; row++) {
