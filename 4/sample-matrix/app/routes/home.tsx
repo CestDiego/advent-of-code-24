@@ -1,5 +1,5 @@
 import type { Route } from "./+types/home";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -12,6 +12,7 @@ interface CellVisit {
   count: number;
   isPartOfXMAS: boolean;
   isCurrentlyChecking: boolean;
+  isSlaming: boolean;
 }
 
 export default function Home() {
@@ -20,6 +21,12 @@ export default function Home() {
   const [xmasCount, setXmasCount] = useState(0);
   const [delay, setDelay] = useState(50);
   const [isRunning, setIsRunning] = useState(false);
+
+  const delayRef = useRef(delay);
+
+  useEffect(() => {
+    delayRef.current = delay;
+  }, [delay]);
 
   // Function to check if a position is valid in the matrix
   const isValid = (row: number, col: number) => {
@@ -63,7 +70,7 @@ export default function Home() {
       });
     });
 
-    await sleep(delay);
+    await sleep(delayRef.current);
 
     // Check pattern
     for (let i = 0; i < 4; i++) {
@@ -103,7 +110,30 @@ export default function Home() {
             newCounts[row][col] = {
               count: newCounts[row][col].count + 1,
               isPartOfXMAS: true,
-              isCurrentlyChecking: false
+              isCurrentlyChecking: false,
+              isSlaming: true
+            };
+          }
+          return newCounts;
+        });
+        resolve();
+      });
+    });
+    
+    // Wait for slam animation
+    await sleep(600);
+
+    // Reset slam state
+    await new Promise<void>(resolve => {
+      requestAnimationFrame(() => {
+        setVisitCounts(prev => {
+          const newCounts = prev.map(row => [...row]);
+          for (let i = 0; i < 4; i++) {
+            const row = startRow + i * rowDir;
+            const col = startCol + i * colDir;
+            newCounts[row][col] = {
+              ...newCounts[row][col],
+              isSlaming: false
             };
           }
           return newCounts;
@@ -154,7 +184,7 @@ export default function Home() {
         const lines = text.trim().split('\n');
         setInput(lines);
         setVisitCounts(lines.map(line => 
-          Array(line.length).fill({ count: 0, isPartOfXMAS: false, isCurrentlyChecking: false })
+          Array(line.length).fill({ count: 0, isPartOfXMAS: false, isCurrentlyChecking: false, isSlaming: false })
         ));
       })
       .catch(error => console.error('Error loading matrix:', error));
@@ -195,11 +225,13 @@ export default function Home() {
                 visitCounts[rowIndex]?.[colIndex]?.isPartOfXMAS ? 'xmas-pattern' : ''
               } ${
                 visitCounts[rowIndex]?.[colIndex]?.isCurrentlyChecking ? 'checking' : ''
+              } ${
+                visitCounts[rowIndex]?.[colIndex]?.isSlaming ? 'slaming' : ''
               }`}
               style={{
                 opacity: visitCounts[rowIndex]?.[colIndex]?.count 
-                  ? Math.min(0.5 + visitCounts[rowIndex][colIndex].count * 0.15, 1)
-                  : 0.5
+                  ? Math.min(0.4 + visitCounts[rowIndex][colIndex].count * 0.45, 1)
+                  : 0.4
               }}
               title={`${char} at [${rowIndex}, ${colIndex}] - Visited ${visitCounts[rowIndex]?.[colIndex]?.count || 0} times`}
             >
@@ -222,23 +254,59 @@ export default function Home() {
           position: fixed;
           top: 20px;
           right: 20px;
-          background: white;
-          padding: 1.5rem;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          background: rgba(255, 255, 255, 0.95);
+          padding: 2rem;
+          border-radius: 12px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.15);
           z-index: 1000;
+          backdrop-filter: blur(5px);
+          min-width: 250px;
+        }
+
+        .control-panel h2 {
+          margin: 0 0 1.5rem 0;
+          color: #333;
+          font-size: 1.5rem;
+          text-align: center;
+          border-bottom: 2px solid #eee;
+          padding-bottom: 0.75rem;
         }
 
         .controls {
           display: flex;
           flex-direction: column;
-          gap: 1rem;
+          gap: 1.5rem;
         }
 
         .controls label {
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
+          gap: 0.75rem;
+          color: #555;
+          font-weight: 500;
+        }
+
+        .controls input[type="range"] {
+          width: 100%;
+          height: 6px;
+          -webkit-appearance: none;
+          background: #e0e0e0;
+          border-radius: 3px;
+          outline: none;
+        }
+
+        .controls input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 18px;
+          height: 18px;
+          background: #4CAF50;
+          border-radius: 50%;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .controls input[type="range"]::-webkit-slider-thumb:hover {
+          background: #45a049;
         }
 
         .start-button {
@@ -246,19 +314,33 @@ export default function Home() {
           background: #4CAF50;
           color: white;
           border: none;
-          border-radius: 4px;
+          border-radius: 6px;
           cursor: pointer;
           font-size: 1rem;
-          transition: background 0.3s ease;
+          font-weight: 600;
+          transition: all 0.3s ease;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
         }
 
         .start-button:hover:not(:disabled) {
           background: #45a049;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
         }
 
         .start-button:disabled {
           background: #cccccc;
           cursor: not-allowed;
+          box-shadow: none;
+        }
+
+        .speed-value {
+          text-align: center;
+          font-size: 0.9rem;
+          color: #666;
+          margin-top: -0.5rem;
         }
 
         .matrix-row {
@@ -311,6 +393,33 @@ export default function Home() {
           0% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.2); opacity: 0.5; }
           100% { transform: scale(1); opacity: 1; }
+        }
+
+        .slaming {
+          animation: slam 0.6s cubic-bezier(.36,.07,.19,.97);
+          transform-origin: center;
+          z-index: 10;
+        }
+
+        @keyframes slam {
+          0% {
+            transform: scale(1) rotate(0deg);
+          }
+          20% {
+            transform: scale(2) rotate(10deg);
+          }
+          40% {
+            transform: scale(1.5) rotate(-8deg);
+          }
+          60% {
+            transform: scale(1.8) rotate(6deg);
+          }
+          80% {
+            transform: scale(0.9) rotate(-4deg);
+          }
+          100% {
+            transform: scale(1) rotate(0deg);
+          }
         }
       `}</style>
     </div>
